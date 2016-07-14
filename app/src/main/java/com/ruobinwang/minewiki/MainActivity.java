@@ -3,6 +3,7 @@ package com.ruobinwang.minewiki;
 import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
+import android.os.Environment;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
@@ -16,6 +17,14 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -50,17 +59,33 @@ public class MainActivity extends AppCompatActivity {
         });
 
         String url = "http://ruobinwang.com/mirrors/en.m.wikipedia.org/wiki/";
-        myWebView.loadUrl(url);
-        myWebView.loadDataWithBaseURL(url,"","text/html","utf-8","");
 
-        final Activity activity = this;
-        myWebView.setWebChromeClient(new WebChromeClient() {
-            public void onProgressChanged(WebView view, int progress) {
-                // Activities and WebViews measure progress with different scales.
-                // The progress meter will automatically disappear when we reach 100%
-                activity.setProgress(progress * 1000);
+        File cacheFile = MainActivity.getCacheStorageDir("webpage");
+        Log.d("io", "cacheFile.length(): " + cacheFile.toString());
+        if(cacheFile.length() > 0)
+        {
+            try{
+                FileInputStream inputStream = new FileInputStream(cacheFile);
+                InputStreamReader inputStreamReader = new InputStreamReader(inputStream);
+                BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
+                String receiveString = "";
+                StringBuilder stringBuilder = new StringBuilder();
+                while ( (receiveString = bufferedReader.readLine()) != null ) {
+                    stringBuilder.append(receiveString);
+                }
+                inputStream.close();
+                myWebView.loadDataWithBaseURL(url,stringBuilder.toString(),"text/html","utf-8","");
+
+            }catch (FileNotFoundException e){
+                myWebView.loadUrl(url);
+                Log.e(this.getClass().getSimpleName(), "File not found: " + e.toString());
+            }catch (IOException e) {
+                myWebView.loadUrl(url);
+                e.printStackTrace();
             }
-        });
+        }else {
+            myWebView.loadUrl(url);
+        }
 
     }
 
@@ -95,6 +120,54 @@ public class MainActivity extends AppCompatActivity {
         {
             // process the html as needed by the app
             Log.d("MyJavaScriptInterface", "processHTML: " + html);
+            File cacheFile = MainActivity.getCacheStorageDir("webpage");
+
+            FileOutputStream outputStream;
+
+            try {
+                outputStream = new FileOutputStream(cacheFile);
+                        //outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
+                outputStream.write(html.getBytes());
+                outputStream.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
         }
+
+
+    }
+
+    public static File getCacheStorageDir(String cacheName) {
+        // Get the directory for the user's public pictures directory.
+        File file = new File(Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_DOWNLOADS), cacheName);
+        try {
+            if (!file.createNewFile()) {
+                Log.e("getCacheStorageDir", "Directory not created");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return file;
+    }
+
+    /* Checks if external storage is available for read and write */
+    public boolean isExternalStorageWritable() {
+        String state = Environment.getExternalStorageState();
+        if (Environment.MEDIA_MOUNTED.equals(state)) {
+            return true;
+        }
+        return false;
+    }
+
+    /* Checks if external storage is available to at least read */
+    public boolean isExternalStorageReadable() {
+        String state = Environment.getExternalStorageState();
+        if (Environment.MEDIA_MOUNTED.equals(state) ||
+                Environment.MEDIA_MOUNTED_READ_ONLY.equals(state)) {
+            return true;
+        }
+        return false;
     }
 }
